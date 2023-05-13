@@ -1,14 +1,12 @@
 import copy
 import os
 
-import gradio as gr
 import modules.scripts as scripts
 import scripts.script_common as sc
 from modules import shared
 from modules.processing import Processed
 from modules.processing import process_images
 from modules.shared import state
-
 
 
 class Script(scripts.Script):
@@ -33,7 +31,7 @@ class Script(scripts.Script):
     # The returned values are passed to the run method as parameters.
 
     def ui(self, is_txt2img):
-        return sc.ui(self)
+        return sc.ui(self, True)
 
     # This is where the additional processing is implemented. The parameters include
     # self, the model object "p" (a StableDiffusionProcessing class, see
@@ -42,7 +40,8 @@ class Script(scripts.Script):
     # to be used in processing. The return value should be a Processed object, which is
     # what is returned by the process_images method.
 
-    def run(self, p, prepend_prompt_text: str, append_prompt: bool, prompt_txt: str, script_overrides: list[str]):
+    def run(self, p, prepend_prompt_text: str, append_prompt: bool, prompt_txt: str, script_overrides: list[str],
+            experiment_settings: list[str]):
 
         import modules.images as img
         import modules.generation_parameters_copypaste as gpc
@@ -59,6 +58,17 @@ class Script(scripts.Script):
             if info is None:
                 raise RuntimeError(f"Unknown checkpoint: {x}")
             sdm.reload_model_weights(shared.sd_model, info)
+
+        def apply_remove_best_shadow(prompt: str):
+            old_prompt = "((masterpiece)), (best quality), (ultra-detailed), (best illustration), (best shadow),"
+            new_prompt = "((masterpiece)), (best quality), (ultra-detailed), (best illustration),"
+            if prompt.startswith(old_prompt):
+                return prompt.replace(old_prompt, new_prompt)
+            return prompt
+
+        def apply_negative_more_parentheses(prompt: str):
+            phrases = prompt.split(", ")
+            return ", ".join(f"({i})" for i in phrases)
 
         fallback_checkpoint = shared.opts.sd_model_checkpoint
         checkpoint_switched = False
@@ -90,6 +100,11 @@ class Script(scripts.Script):
                     for ovr in sc.possible_overrides:
                         if ovr in script_overrides:
                             args.pop(sc.overrides_mapping.get(ovr, None))
+
+                    if "Remove best shadow from defaults" in experiment_settings:
+                        args['prompt'] = apply_remove_best_shadow(args['prompt'])
+                    if "Negative more parentheses" in experiment_settings:
+                        args['negative_prompt'] = apply_negative_more_parentheses(args['negative_prompt'])
 
                     for arg, val in args.items():
                         func = sc.prompt_tags.get(arg, None)

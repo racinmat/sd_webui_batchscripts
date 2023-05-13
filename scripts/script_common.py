@@ -122,6 +122,7 @@ prompt_tags = {
 
 overrides_mapping = {
     "Override Model": "sd_model_hash",
+    "Override Negative prompt": "negative_prompt",
     "Override Seed": "seed",
     "Override Steps": "steps",
     "Override CFG Scale": "cfg_scale",
@@ -141,8 +142,12 @@ def load_prompt_file(file):
         return None, "\n".join(lines), gr.update(lines=7)
 
 
-def ui(script: scripts.Script):
+def ui(script: scripts.Script, is_batch_a=False):
     script_overrides = gr.CheckboxGroup(label="Overrides", choices=possible_overrides, value=default_overrides)
+    if is_batch_a:
+        experiment_settings = gr.CheckboxGroup(label="Additional features",
+                                               choices=["Remove best shadow from defaults",
+                                                        "Negative more parentheses"])
     with gr.Accordion(label="Prompt overrides", open=False):
         prepend_prompt_text = gr.Textbox(label="Text to prepend", lines=1,
                                          elem_id=script.elem_id("prepend_prompt_text"))
@@ -158,4 +163,6 @@ def ui(script: scripts.Script):
     # be unclear to the user that shift-enter is needed.
     prompt_txt.change(lambda tb: gr.update(lines=7) if ("\n" in tb) else gr.update(lines=2), inputs=[prompt_txt],
                       outputs=[prompt_txt], show_progress=False)
+    if is_batch_a:
+        return [prepend_prompt_text, append_prompt, prompt_txt, script_overrides, experiment_settings]
     return [prepend_prompt_text, append_prompt, prompt_txt, script_overrides]
